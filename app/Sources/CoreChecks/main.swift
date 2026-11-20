@@ -4623,7 +4623,81 @@ func callSpeakersB2() {
     expect(!CallSpeakers.notesStale(editedAt: 1000, notesWritten: Date(timeIntervalSince1970: 1200)) && !CallSpeakers.notesStale(editedAt: nil, notesWritten: Date()), "speakers: notes up to date")
 }
 
+/// 0.26.2: the model lists of the API pickers come from the provider: text models only, newest first, a model
+/// without a price in the app marked, the list kept on disk, the built-in list when nothing was read.
+func modelCatalog0262() {
+    func js(_ s: String) -> Data { Data(s.utf8) }
+    let gem = ModelCatalog.parseGemini(js("""
+    {"models": [
+     {"name": "models/gemini-4-hydrogen", "displayName": "Gemini 4 Hydrogen", "supportedGenerationMethods": ["generateContent", "countTokens"]},
+     {"name": "models/gemini-3.5-flash-lite", "displayName": "Gemini 3.5 Flash-Lite", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-4-argon", "displayName": "Gemini 4 Argon", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-3.8-flash", "displayName": "Gemini 3.8 Flash", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-embedding-001", "supportedGenerationMethods": ["embedContent"]},
+     {"name": "models/gemini-4-argon-image", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-flash-latest", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemma-4-31b-it", "supportedGenerationMethods": ["generateContent"]}
+    ], "nextPageToken": "abc"}
+    """))
+    expect(gem.entries.map(\.id) == ["gemini-4-hydrogen", "gemini-3.5-flash-lite", "gemini-4-argon", "gemini-3.8-flash"], "catalog: Gemini text models only \(gem.entries.map(\.id))")
+    expect(gem.next == "abc" && ModelCatalog.parseGemini(js("{\"models\": []}")).next == nil, "catalog: Gemini page token")
+    expect(ModelCatalog.sorted(gem.entries).map(\.id) == ["gemini-4-argon", "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite"], "catalog: Gemini newest version first")
+    let hyd = gem.entries[0], lite = gem.entries[1]
+    expect(!hyd.known && hyd.label == "Gemini 4 Hydrogen" && lite.known && lite.label.contains("$0.30"), "catalog: no price for Hydrogen, a label with the price for Flash-Lite")
+
+    let oa = ModelCatalog.parseOpenAI(js("""
+    {"data": [
+     {"id": "gpt-6.1-sol", "created": 200}, {"id": "gpt-7-nova", "created": 300}, {"id": "gpt-6-luna", "created": 100},
+     {"id": "gpt-6-luna-2026-11-04", "created": 100}, {"id": "text-embedding-3-large", "created": 50},
+     {"id": "gpt-6-realtime", "created": 90}, {"id": "whisper-1", "created": 10}, {"id": "gpt-6-image", "created": 90}
+    ]}
+    """))
+    expect(ModelCatalog.sorted(oa.entries).map(\.id) == ["gpt-7-nova", "gpt-6.1-sol", "gpt-6-luna"], "catalog: OpenAI text models, newest first \(oa.entries.map(\.id))")
+    expect(!oa.entries.first(where: { $0.id == "gpt-7-nova" })!.known && oa.entries.first(where: { $0.id == "gpt-6.1-sol" })!.known, "catalog: OpenAI price known or not")
+
+    let cl = ModelCatalog.parseClaude(js("""
+    {"data": [
+     {"id": "claude-haiku-5-5", "display_name": "Claude Haiku 5.5", "created_at": "2026-05-01T00:00:00Z"},
+     {"id": "claude-opus-6", "display_name": "Claude Opus 6", "created_at": "2026-12-01T00:00:00Z"},
+     {"id": "claude-sonnet-5-5", "display_name": "Claude Sonnet 5.5", "created_at": "2026-06-01T00:00:00.123Z"},
+     {"id": "other-model", "display_name": "Other"}
+    ], "has_more": true, "last_id": "claude-sonnet-5-5"}
+    """))
+    expect(ModelCatalog.sorted(cl.entries).map(\.id) == ["claude-opus-6", "claude-sonnet-5-5", "claude-haiku-5-5"], "catalog: Claude by date, newest first")
+    expect(cl.next == "claude-sonnet-5-5" && cl.entries.first(where: { $0.id == "claude-sonnet-5-5" })!.known && !cl.entries.first(where: { $0.id == "claude-opus-6" })!.known, "catalog: Claude page and price")
+    expect(ModelCatalog.parseClaude(js("not json")).entries.isEmpty && ModelCatalog.parseGemini(js("[]")).entries.isEmpty, "catalog: unreadable answer gives nothing")
+
+    // a picker: the provider's list; the built-in one when nothing was read; the chosen model never vanishes
+    expect(ModelCatalog.choices(.gemini, live: [], selected: "gemini-3.8-flash").map(\.id) == ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.5-flash-lite"], "catalog: built-in list, newest first")
+    let withOld = ModelCatalog.choices(.gemini, live: gem.entries, selected: "gemini-2.5-pro").map(\.id)
+    expect(withOld.first == "gemini-4-argon" && withOld.last == "gemini-2.5-pro" && withOld.count == 5, "catalog: a model chosen earlier stays in the list \(withOld)")
+    expect(ModelCatalog.unique(gem.entries + gem.entries).count == 4, "catalog: one row per model")
+
+    // cache and freshness
+    let dir = NSTemporaryDirectory() + "catalog-\(getpid())"
+    ModelCatalog.saveCache(gem.entries, fetchedAt: 1000, dir: dir, provider: .gemini)
+    let back = ModelCatalog.loadCache(dir: dir, provider: .gemini)
+    expect(back?.entries == gem.entries && back?.fetchedAt == 1000 && ModelCatalog.loadCache(dir: dir, provider: .openai) == nil, "catalog: cache round trip")
+    try? FileManager.default.removeItem(atPath: dir)
+    expect(ModelCatalog.isFresh(fetchedAt: 1000, now: 1000 + 3600) && !ModelCatalog.isFresh(fetchedAt: 1000, now: 1000 + 7 * 3600) && !ModelCatalog.isFresh(fetchedAt: 5000, now: 1000), "catalog: fresh for 6 hours")
+    let relabeled = ModelCatalog.relabel([ModelCatalog.Entry(id: "gemini-4-argon", label: "old", known: false)])
+    expect(relabeled[0].known && relabeled[0].label.contains("$2 / $10"), "catalog: a cached list follows the app's price table")
+
+    // spending: a model without a price is counted as a request with no price, not as $0 spent
+    let rows = AIUsage.parse(text: """
+    {"at": "2026-11-20T10:00:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "input": 100, "output": 20, "usd": null, "error": false}
+    {"at": "2026-11-20T10:01:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "input": 100, "output": 20, "usd": null, "error": false}
+    {"at": "2026-11-20T10:02:00+0200", "job": "live", "route": "gemini", "model": "gemini-3.5-flash-lite", "input": 100, "output": 20, "usd": 0.001, "error": false}
+    {"at": "2026-11-20T10:03:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "error": true}
+    """)
+    let by = AIUsage.byModel(rows)
+    let hy = by.first { $0.model == "gemini-4-hydrogen" }?.total, fl = by.first { $0.model == "gemini-3.5-flash-lite" }?.total
+    expect(rows.count == 4 && !rows[0].priced && rows[2].priced && rows[3].priced, "usage: priced flag")
+    expect(hy?.unpriced == 2 && hy?.requests == 3 && fl?.unpriced == 0 && AIUsage.total(rows).unpriced == 2, "usage: unpriced requests counted")
+}
+
 notionOAuthINT2()
+modelCatalog0262()
 notionINT3()
 meetingRecap0261()
 callFolders()

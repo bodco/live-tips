@@ -16,6 +16,7 @@ public enum AIUsage {
         public var output = 0
         public var cacheRead = 0
         public var usd = 0.0
+        public var priced = true          // 0.26.2: false when the model has no price in the app (usd null), so it counts as $0
         public var error = false
         public init(day: String, stage: String, provider: String, model: String) {
             self.day = day; self.stage = stage; self.provider = provider; self.model = model
@@ -27,8 +28,12 @@ public enum AIUsage {
         public var input = 0
         public var output = 0
         public var usd = 0.0
+        public var unpriced = 0           // 0.26.2: requests of a model without a price: not in `usd`
         public init() {}
-        public mutating func add(_ r: Row) { requests += 1; input += r.input + r.cacheRead; output += r.output; usd += r.usd }
+        public mutating func add(_ r: Row) {
+            requests += 1; input += r.input + r.cacheRead; output += r.output; usd += r.usd
+            if !r.priced { unpriced += 1 }
+        }
     }
 
     /// The provider of an API way; nil for the accounts (code, codex), the model on this Mac and the plan.
@@ -59,6 +64,7 @@ public enum AIUsage {
         r.cacheRead = int(o["cache_read"])
         r.usd = (o["usd"] as? NSNumber)?.doubleValue ?? 0
         r.error = (o["error"] as? Bool) ?? false
+        r.priced = (o["usd"] is NSNumber) || r.error || r.input + r.output + r.cacheRead == 0
         if r.model.isEmpty { r.model = "unknown" }
         return r
     }
